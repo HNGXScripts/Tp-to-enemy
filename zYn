@@ -1,0 +1,555 @@
+-- Premium Teleport to Enemy - zYn • Enhanced Luxury Edition
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+-- Variables
+local savedPos = nil
+local teleporting = false
+local teleportRange = 50
+local teleportDelay = 0.5
+local teleportCount = 0
+local autoReturn = true
+
+-- Animation settings
+local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+-- GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TeleportEnemyGUI"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+-- Helper functions for luxury styling
+local function addLuxuryCorner(frame, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius or 18)
+    corner.Parent = frame
+end
+
+local function addLuxuryGradient(frame, colors, rotation)
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = colors
+    gradient.Rotation = rotation or 0
+    gradient.Parent = frame
+    
+    -- Animated gradient rotation
+    local gradientTween = TweenService:Create(gradient, TweenInfo.new(6, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {
+        Rotation = (rotation or 0) + 360
+    })
+    gradientTween:Play()
+    
+    return gradient
+end
+
+local function addGlowStroke(frame, color, thickness)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = color or Color3.fromRGB(255, 255, 255)
+    stroke.Thickness = thickness or 2
+    stroke.Transparency = 0.3
+    stroke.Parent = frame
+    
+    -- Pulsing glow effect
+    local glowTween = TweenService:Create(stroke, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        Transparency = 0.7
+    })
+    glowTween:Play()
+    
+    return stroke
+end
+
+-- Main Frame with luxury design
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 360, 0, 220)
+Frame.Position = UDim2.new(0.5, -180, 0.5, -110)
+Frame.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
+addLuxuryCorner(Frame, 25)
+
+-- Luxury outer gradient (Teleport-themed colors - Purple/Blue/Cyan)
+local frameGradient = addLuxuryGradient(Frame, ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(150, 50, 255)),  -- Purple
+    ColorSequenceKeypoint.new(0.2, Color3.fromRGB(50, 150, 255)), -- Blue
+    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(50, 255, 200)), -- Cyan
+    ColorSequenceKeypoint.new(0.6, Color3.fromRGB(150, 50, 255)), -- Purple
+    ColorSequenceKeypoint.new(0.8, Color3.fromRGB(255, 50, 150)), -- Pink
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 50, 255))    -- Purple
+}, 0)
+frameGradient.Transparency = NumberSequence.new{
+    NumberSequenceKeypoint.new(0, 0.2),
+    NumberSequenceKeypoint.new(0.5, 0.1),
+    NumberSequenceKeypoint.new(1, 0.2)
+}
+
+-- Inner frame for content
+local InnerFrame = Instance.new("Frame")
+InnerFrame.Size = UDim2.new(1, -4, 1, -4)
+InnerFrame.Position = UDim2.new(0, 2, 0, 2)
+InnerFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 15)
+InnerFrame.BorderSizePixel = 0
+InnerFrame.Parent = Frame
+addLuxuryCorner(InnerFrame, 23)
+
+local innerGradient = addLuxuryGradient(InnerFrame, ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 30, 50)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(40, 20, 60)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 40, 45))
+}, 45)
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Text = "zYn • teleport enemy"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Position = UDim2.new(0, 0, 0, 5)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 20
+Title.Font = Enum.Font.GothamBold
+Title.TextStrokeTransparency = 0.5
+Title.TextStrokeColor3 = Color3.fromRGB(150, 100, 255)
+Title.Parent = InnerFrame
+
+-- Function to create luxury buttons
+local function createLuxuryButton(text, size, position, parent)
+    local btn = Instance.new("TextButton")
+    btn.Size = size
+    btn.Position = position
+    btn.Text = text
+    btn.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.TextStrokeTransparency = 0.7
+    btn.TextStrokeColor3 = Color3.fromRGB(180, 150, 255)
+    btn.Parent = parent or InnerFrame
+    addLuxuryCorner(btn, 12)
+    
+    local gradient = addLuxuryGradient(btn, ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(200, 120, 255)),
+        ColorSequenceKeypoint.new(0.25, Color3.fromRGB(120, 200, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(120, 255, 200)),
+        ColorSequenceKeypoint.new(0.75, Color3.fromRGB(200, 255, 120)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 120, 255))
+    }, 0)
+    gradient.Transparency = NumberSequence.new{
+        NumberSequenceKeypoint.new(0, 0.4),
+        NumberSequenceKeypoint.new(0.5, 0.2),
+        NumberSequenceKeypoint.new(1, 0.4)
+    }
+    
+    addGlowStroke(btn, Color3.fromRGB(150, 120, 255), 1)
+    
+    -- Hover effects
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.3), {
+            Size = size + UDim2.new(0, 4, 0, 2),
+            BackgroundColor3 = Color3.fromRGB(40, 45, 60)
+        }):Play()
+        TweenService:Create(gradient, TweenInfo.new(0.3), {
+            Transparency = NumberSequence.new{
+                NumberSequenceKeypoint.new(0, 0.1),
+                NumberSequenceKeypoint.new(0.5, 0),
+                NumberSequenceKeypoint.new(1, 0.1)
+            }
+        }):Play()
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.3), {
+            Size = size,
+            BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+        }):Play()
+        TweenService:Create(gradient, TweenInfo.new(0.3), {
+            Transparency = NumberSequence.new{
+                NumberSequenceKeypoint.new(0, 0.4),
+                NumberSequenceKeypoint.new(0.5, 0.2),
+                NumberSequenceKeypoint.new(1, 0.4)
+            }
+        }):Play()
+    end)
+    
+    return btn, gradient
+end
+
+-- Main Teleport Button
+local TeleportButton, TeleportGradient = createLuxuryButton(
+    "🌀 Teleport to Enemy", 
+    UDim2.new(0, 220, 0, 45), 
+    UDim2.new(0, 20, 0, 50)
+)
+
+-- Status indicator with teleport effect
+local StatusLight = Instance.new("Frame")
+StatusLight.Size = UDim2.new(0, 15, 0, 15)
+StatusLight.Position = UDim2.new(0, 255, 0, 65)
+StatusLight.BackgroundColor3 = Color3.fromRGB(100, 255, 200)
+StatusLight.BorderSizePixel = 0
+StatusLight.Parent = InnerFrame
+addLuxuryCorner(StatusLight, 8)
+
+local lightGradient = addLuxuryGradient(StatusLight, ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(150, 255, 200)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 200, 255))
+}, 0)
+
+-- Teleport glow effect for status light
+addGlowStroke(StatusLight, Color3.fromRGB(100, 255, 200), 2)
+
+-- Teleport Counter
+local CounterLabel = Instance.new("TextLabel")
+CounterLabel.Text = "Teleports: 0"
+CounterLabel.Size = UDim2.new(0, 120, 0, 25)
+CounterLabel.Position = UDim2.new(0, 20, 0, 105)
+CounterLabel.BackgroundTransparency = 1
+CounterLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+CounterLabel.TextSize = 14
+CounterLabel.Font = Enum.Font.GothamBold
+CounterLabel.TextStrokeTransparency = 0.7
+CounterLabel.TextStrokeColor3 = Color3.fromRGB(150, 200, 255)
+CounterLabel.TextXAlignment = Enum.TextXAlignment.Left
+CounterLabel.Parent = InnerFrame
+
+-- Range Display
+local RangeLabel = Instance.new("TextLabel")
+RangeLabel.Text = "Range: " .. teleportRange
+RangeLabel.Size = UDim2.new(0, 100, 0, 25)
+RangeLabel.Position = UDim2.new(0, 150, 0, 105)
+RangeLabel.BackgroundTransparency = 1
+RangeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+RangeLabel.TextSize = 14
+RangeLabel.Font = Enum.Font.GothamBold
+RangeLabel.TextStrokeTransparency = 0.7
+RangeLabel.TextStrokeColor3 = Color3.fromRGB(150, 200, 255)
+RangeLabel.TextXAlignment = Enum.TextXAlignment.Left
+RangeLabel.Parent = InnerFrame
+
+-- Auto Return Toggle
+local AutoReturnButton, AutoReturnGradient = createLuxuryButton(
+    "Auto Return: ON", 
+    UDim2.new(0, 120, 0, 30), 
+    UDim2.new(0, 20, 0, 140)
+)
+
+-- Settings Button
+local SettingsButton, SettingsGradient = createLuxuryButton(
+    "⚙ Settings", 
+    UDim2.new(0, 80, 0, 30), 
+    UDim2.new(0, 150, 0, 140)
+)
+
+-- Reset Counter Button
+local ResetButton, ResetGradient = createLuxuryButton(
+    "Reset", 
+    UDim2.new(0, 60, 0, 30), 
+    UDim2.new(0, 240, 0, 140)
+)
+
+-- Close Button
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 32, 0, 32)
+CloseBtn.Position = UDim2.new(1, -40, 0, 8)
+CloseBtn.Text = "×"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 18
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.BackgroundColor3 = Color3.fromRGB(40, 25, 35)
+CloseBtn.TextStrokeTransparency = 0.5
+CloseBtn.TextStrokeColor3 = Color3.fromRGB(255, 100, 150)
+CloseBtn.Parent = InnerFrame
+addLuxuryCorner(CloseBtn, 8)
+
+local closeGradient = addLuxuryGradient(CloseBtn, ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 120, 160)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 160, 120)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 120, 160))
+}, 0)
+closeGradient.Transparency = NumberSequence.new(0.3)
+
+-- Circle Button (minimized state)
+local CircleBtn = Instance.new("TextButton")
+CircleBtn.Size = UDim2.new(0, 50, 0, 50)
+CircleBtn.Position = UDim2.new(0.5, -25, 0.8, 0)
+CircleBtn.Text = "🌀"
+CircleBtn.TextSize = 20
+CircleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CircleBtn.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+CircleBtn.Visible = false
+CircleBtn.Active = true
+CircleBtn.Draggable = true
+CircleBtn.Font = Enum.Font.GothamBold
+CircleBtn.Parent = ScreenGui
+addLuxuryCorner(CircleBtn, 25)
+
+-- Circle glow effect with teleport colors
+local CircleGlow = Instance.new("Frame")
+CircleGlow.Size = UDim2.new(1, 8, 1, 8)
+CircleGlow.Position = UDim2.new(0, -4, 0, -4)
+CircleGlow.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+CircleGlow.BackgroundTransparency = 0.7
+CircleGlow.ZIndex = -1
+CircleGlow.Parent = CircleBtn
+addLuxuryCorner(CircleGlow, 29)
+
+local circleGlowGradient = addLuxuryGradient(CircleGlow, ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(150, 50, 255)),
+    ColorSequenceKeypoint.new(0.2, Color3.fromRGB(50, 150, 255)),
+    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(50, 255, 200)),
+    ColorSequenceKeypoint.new(0.6, Color3.fromRGB(150, 50, 255)),
+    ColorSequenceKeypoint.new(0.8, Color3.fromRGB(255, 50, 150)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 50, 255))
+}, 0)
+
+-- Pulsing animation for circle
+local circlePulse = TweenService:Create(CircleGlow, TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+    Size = UDim2.new(1, 12, 1, 12),
+    Position = UDim2.new(0, -6, 0, -6),
+    BackgroundTransparency = 0.9
+})
+
+local circleGradient = addLuxuryGradient(CircleBtn, ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(150, 100, 255)),
+    ColorSequenceKeypoint.new(0.33, Color3.fromRGB(100, 200, 255)),
+    ColorSequenceKeypoint.new(0.66, Color3.fromRGB(100, 255, 200)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 100, 255))
+}, 0)
+circleGradient.Transparency = NumberSequence.new(0.4)
+
+-- Functions
+local function showTeleportEffect()
+    teleportCount = teleportCount + 1
+    CounterLabel.Text = "Teleports: " .. teleportCount
+    
+    -- Flash effect
+    TweenService:Create(StatusLight, TweenInfo.new(0.2), {
+        Size = UDim2.new(0, 20, 0, 20)
+    }):Play()
+    
+    TweenService:Create(CounterLabel, TweenInfo.new(0.2), {
+        TextColor3 = Color3.fromRGB(150, 255, 200)
+    }):Play()
+    
+    wait(0.2)
+    
+    TweenService:Create(StatusLight, TweenInfo.new(0.3), {
+        Size = UDim2.new(0, 15, 0, 15)
+    }):Play()
+    
+    TweenService:Create(CounterLabel, TweenInfo.new(0.3), {
+        TextColor3 = Color3.fromRGB(255, 255, 255)
+    }):Play()
+end
+
+local function updateTeleportingStatus(isActive)
+    if isActive then
+        TeleportButton.Text = "🌀 Teleporting..."
+        TeleportGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 200, 100)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 150, 200)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 255, 150))
+        }
+        
+        -- Status light pulse faster
+        for _, child in pairs(StatusLight:GetChildren()) do
+            if child:IsA("UIStroke") then
+                child.Color = Color3.fromRGB(255, 200, 100)
+            end
+        end
+    else
+        TeleportButton.Text = "🌀 Teleport to Enemy"
+        TeleportGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(200, 120, 255)),
+            ColorSequenceKeypoint.new(0.25, Color3.fromRGB(120, 200, 255)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(120, 255, 200)),
+            ColorSequenceKeypoint.new(0.75, Color3.fromRGB(200, 255, 120)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 120, 255))
+        }
+        
+        -- Reset status light
+        for _, child in pairs(StatusLight:GetChildren()) do
+            if child:IsA("UIStroke") then
+                child.Color = Color3.fromRGB(100, 255, 200)
+            end
+        end
+    end
+end
+
+-- Function: get closest enemy in front (enhanced with wall penetration)
+local function getEnemyInFront()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local root = char.HumanoidRootPart
+
+    local nearest = nil
+    local shortestDist = teleportRange
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local enemyRoot = plr.Character.HumanoidRootPart
+            local direction = (enemyRoot.Position - root.Position)
+            
+            -- Check if enemy is in front (improved angle detection)
+            local forwardDot = direction.Unit:Dot(root.CFrame.LookVector)
+            if forwardDot > 0.3 then -- 70 degree cone in front
+                local dist = direction.Magnitude
+                if dist < shortestDist then
+                    local canTeleport = false
+                    
+                    if wallPenetration then
+                        -- If wall penetration is enabled, skip wall check
+                        canTeleport = true
+                    else
+                        -- Enhanced line of sight check only if wall penetration is disabled
+                        local rayOrigin = root.Position + Vector3.new(0, 0.5, 0)
+                        local rayDirection = direction.Unit * direction.Magnitude
+                        local raycastParams = RaycastParams.new()
+                        raycastParams.FilterDescendantsInstances = {char}
+                        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+                        
+                        local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+                        
+                        if not raycastResult or raycastResult.Instance:IsDescendantOf(plr.Character) then
+                            canTeleport = true
+                        end
+                    end
+                    
+                    if canTeleport then
+                        shortestDist = dist
+                        nearest = {root = enemyRoot, player = plr, distance = dist}
+                    end
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+-- Enhanced teleport function
+local function performTeleport()
+    if teleporting then return end
+    teleporting = true
+    updateTeleportingStatus(true)
+
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then 
+        teleporting = false 
+        updateTeleportingStatus(false)
+        return 
+    end
+    local root = char.HumanoidRootPart
+
+    local enemy = getEnemyInFront()
+    if enemy then
+        savedPos = root.CFrame
+        
+        -- Calculate teleport position (beside enemy, facing them)
+        local enemyRoot = enemy.root
+        local teleportPos = enemyRoot.CFrame * CFrame.new(3, 0, 0) -- 3 studs to the right
+        teleportPos = teleportPos * CFrame.Angles(0, math.rad(-90), 0) -- Face the enemy
+        
+        -- Smooth teleport effect
+        root.CFrame = teleportPos
+        showTeleportEffect()
+
+        -- Wait for specified delay
+        task.wait(teleportDelay)
+        
+        -- Auto return if enabled
+        if autoReturn and savedPos then
+            root.CFrame = savedPos
+        end
+    else
+        -- No enemy found feedback
+        TeleportButton.Text = "No Enemy Found!"
+        wait(1)
+        TeleportButton.Text = "🌀 Teleport to Enemy"
+    end
+
+    teleporting = false
+    updateTeleportingStatus(false)
+end
+
+-- Button Events
+TeleportButton.MouseButton1Click:Connect(function()
+    performTeleport()
+end)
+
+AutoReturnButton.MouseButton1Click:Connect(function()
+    autoReturn = not autoReturn
+    AutoReturnButton.Text = autoReturn and "Auto Return: ON" or "Auto Return: OFF"
+    
+    if autoReturn then
+        AutoReturnGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 255, 150)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 255, 120)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 255, 150))
+        }
+    else
+        AutoReturnGradient.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 150, 120)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 120, 150)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 150, 120))
+        }
+    end
+end)
+
+ResetButton.MouseButton1Click:Connect(function()
+    teleportCount = 0
+    CounterLabel.Text = "Teleports: 0"
+    
+    -- Visual feedback
+    TweenService:Create(ResetGradient, TweenInfo.new(0.3), {
+        Transparency = NumberSequence.new(0)
+    }):Play()
+    
+    wait(0.5)
+    
+    TweenService:Create(ResetGradient, TweenInfo.new(0.5), {
+        Transparency = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 0.4),
+            NumberSequenceKeypoint.new(0.5, 0.2),
+            NumberSequenceKeypoint.new(1, 0.4)
+        }
+    }):Play()
+end)
+
+-- Settings Panel
+local SettingsFrame = Instance.new("Frame")
+SettingsFrame.Size = UDim2.new(0, 280, 0, 180)
+SettingsFrame.Position = UDim2.new(0.5, -140, 0.5, -90)
+SettingsFrame.BackgroundColor3 = Color3.fromRGB(5, 5, 8)
+SettingsFrame.BorderSizePixel = 0
+SettingsFrame.Visible = false
+SettingsFrame.Parent = ScreenGui
+addLuxuryCorner(SettingsFrame, 20)
+
+-- Settings outer gradient
+local settingsGradient = addLuxuryGradient(SettingsFrame, ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 50, 200)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(50, 100, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 50, 200))
+}, 0)
+settingsGradient.Transparency = NumberSequence.new{
+    NumberSequenceKeypoint.new(0, 0.3),
+    NumberSequenceKeypoint.new(0.5, 0.1),
+    NumberSequenceKeypoint.new(1, 0.3)
+}
+
+-- Settings inner frame
+local SettingsInner = Instance.new("Frame")
+SettingsInner.Size = UDim2.new(1, -4, 1, -4)
+SettingsInner.Position = UDim2.new(0, 2, 0, 2)
+SettingsInner.BackgroundColor3 = Color3.fromRGB(8, 8, 15)
+SettingsInner.BorderSizePixel = 0
+SettingsInner.Parent = SettingsFrame
+addLuxuryCorner(SettingsInner, 18)
+
+-- Settings title
+local SettingsTitle = Instance.new("TextLabel")
+SettingsTitle.Text = "⚙ Settings"
+SettingsTitle.Size = UDim2.new(1, 0, 0, 35)
+SettingsTitle.Position = UDim2.new(0, 0, 
